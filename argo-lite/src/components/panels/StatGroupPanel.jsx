@@ -29,7 +29,7 @@ class StatGroupPanel extends React.Component {
     this.state = {};
   }
 
-  runLocalANN = () => {
+  runCommunityANN = () => {
     const calculateDistance = (lat1, lon1, lat2, lon2) => {
       const R = 6371; // Radius of the Earth in kilometers
       const dLat = (lat2 - lat1) * (Math.PI / 180);
@@ -98,7 +98,6 @@ class StatGroupPanel extends React.Component {
       return;
     }
     // calculate local ANN for each community to create ANN vs. neighbor order plots for each community, where x axis represents the order of neighbors and y axis represents the ANN value.
-    const maxOrder = appState.graph.ann_order; // how many neighbor orders to compute
     // create a community dict where the keys are community ids and the values are the nodes in that community
     const communityDict = {};
     // createa community ann dict to store the ANN values for each community, where the keys are community ids and the values are the ANN values for each order
@@ -118,6 +117,8 @@ class StatGroupPanel extends React.Component {
       communityDict[node.community].push(node);
     });
     console.log(communityDict);
+    // appState.graph.ann_order is the maximum number of neighbors among all communities
+    let maxOrder = 0; // how many neighbor orders to compute
     // record the color for each community in community_color_dict
     const c_color_dict = {};
     const frame_nodes = appState.graph.frame.getNodeList();
@@ -128,7 +129,11 @@ class StatGroupPanel extends React.Component {
           c_color_dict[c_id] = node.renderData.color;
         }
       });
+      if (c_nodes.length > maxOrder) {
+        maxOrder = c_nodes.length;
+      }
     }
+    appState.graph.ann_order = maxOrder;
     appState.graph.community_color_dict = c_color_dict;
     // compute ANN for each community
     for (let order = 1; order <= maxOrder; order++) {
@@ -1110,7 +1115,7 @@ class StatGroupPanel extends React.Component {
         <Button
           className="bp4-button"
           style={{ zIndex: "1000" }}
-          onClick={this.runLocalANN}
+          onClick={this.runCommunityANN}
         >
           Run Community ANN
         </Button>

@@ -93,13 +93,13 @@ export default class GraphStore {
   @observable globalFlatRatio = undefined;
   @observable globalANN = undefined;
   @observable keydown = false;
+  @observable ann_order = 0;
   clusteringco = 0;
   graphDiameter = 0;
   connectcom = 0;
   community_color_dict = {};
   community_ann_dict = {};
   community_expect_ann_dict = {};
-  ann_order = 10;
 
   //access to process.js "self"
   @observable process = undefined;

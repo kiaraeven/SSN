@@ -89,33 +89,22 @@ class StatGroupPanel extends React.Component {
       return observedDistance / c_n; // Average Nearest Neighbor Distance
     };
 
-    // Run ANN for each community
     const nodes = appState.graph.rawGraph.nodes;
     if (!nodes[0]["community"]) {
-      // this.runcommunity();
       // pop up a prompt box to ask user to run community detection first
       alert("Please run community detection first");
       return;
     }
     // calculate local ANN for each community to create ANN vs. neighbor order plots for each community, where x axis represents the order of neighbors and y axis represents the ANN value.
     // create a community dict where the keys are community ids and the values are the nodes in that community
-    const communityDict = {};
+    const communityDict = appState.graph.community_dict;
     // createa community ann dict to store the ANN values for each community, where the keys are community ids and the values are the ANN values for each order
     // initialize annValuesDict with empty arrays for each community
     const annValuesDict = {};
-    nodes.forEach((node) => {
-      // skip nodes that are not in any community
-      if (node.community === "-1") {
-        return;
-      }
-      if (!communityDict[node.community]) {
-        communityDict[node.community] = [];
-      }
-      if (!annValuesDict[node.community]) {
-        annValuesDict[node.community] = [];
-      }
-      communityDict[node.community].push(node);
-    });
+    // init annValuesDict with empty arrays for each community
+    for (const c_id of Object.keys(communityDict)) {
+      annValuesDict[c_id] = [];
+    }
     console.log(communityDict);
     // appState.graph.ann_order is the maximum number of neighbors among all communities
     let maxOrder = 0; // how many neighbor orders to compute
@@ -175,6 +164,79 @@ class StatGroupPanel extends React.Component {
     appState.graph.scatterplot.y = "ANN";
   };
 
+  // Calculate the probability that a node's k nearest neighbors are in the same community as the node for each node
+  runKNNProbability = () => {
+    const calculateDistance = (lat1, lon1, lat2, lon2) => {
+      const R = 6371; // Radius of the Earth in kilometers
+      const dLat = (lat2 - lat1) * (Math.PI / 180);
+      const dLon = (lon2 - lon1) * (Math.PI / 180);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * (Math.PI / 180)) *
+          Math.cos(lat2 * (Math.PI / 180)) *
+          Math.sin(dLon / 2) *
+          Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distance = R * c;
+      return distance; // distance in kilometers
+    };
+
+    const nodes = appState.graph.rawGraph.nodes;
+    for (const node of nodes) {
+      // calculate the distance between the node and all other nodes in the network, save them in an array where each element is a pair (the_other_node_id, distance between two nodes) and sorted by distance.
+      // the nearest neighborhood only consider geographic distance regardless of the connection
+      const neighbor_distances = [];
+      for (const other_node of nodes) {
+        if (node.ID !== other_node.ID) {
+          const distance = calculateDistance(
+            node.LatY,
+            node.LonX,
+            other_node.LatY,
+            other_node.LonX
+          );
+          neighbor_distances.push({
+            other_node: other_node,
+            distance: distance,
+          });
+        }
+      }
+      // console.log("neighbor_distances:", neighbor_distances);
+      // find the k nearest neighbors from neirbor_distances
+      neighbor_distances.sort((a, b) => a.distance - b.distance);
+      const k = node.degree;
+      if (k === 0 || node.community === "-1") {
+        node["k-NN Probability"] = 0;
+        continue;
+      }
+      const k_nearest_neighbors = neighbor_distances
+        .slice(0, k)
+        .map((n) => n.other_node);
+      console.log("k_nearest_neighbors:", k_nearest_neighbors);
+      var count = 0; // count the number of k nearest neighbors that are in the same community as the node
+      for (const neighbor of k_nearest_neighbors) {
+        console.log(neighbor.community, node.community);
+        if (neighbor.community === node.community) {
+          count += 1;
+        }
+      }
+      console.log("count:", count);
+      const probability = count / k;
+      node["k-NN Probability"] = probability;
+    }
+    // console.log the nodes whose k-NN Probability is not 0
+    const nodes_with_nonzero_prob = nodes.filter(
+      (node) => node["k-NN Probability"] !== 0
+    );
+    console.log(nodes_with_nonzero_prob);
+
+    // appState.graph.metadata.nodeComputed.push("k-NN Probability");
+    appState.graph.scatterplot.x = "k-NN Probability";
+    appState.graph.scatterplot.y = "Community";
+    appState.graph.nodes.color.scale = "Nominal Scale";
+    appState.graph.nodes.colorBy = "community";
+    appState.graph.watchAppearance = appState.graph.watchAppearance + 1; //force update
+  };
+
   runcommunity = () => {
     appState.graph.convexPolygons = [];
 
@@ -210,6 +272,19 @@ class StatGroupPanel extends React.Component {
             node.community = "-1";
           }
         });
+        // construct community dict for graph_store
+        var communityDict = {};
+        appState.graph.rawGraph.nodes.forEach((node) => {
+          // skip nodes that are not in any community
+          if (node.community === "-1") {
+            return;
+          }
+          if (!communityDict[node.community]) {
+            communityDict[node.community] = [];
+          }
+          communityDict[node.community].push(node);
+        });
+        appState.graph.community_dict = communityDict;
         const nodesArr = appState.graph.rawGraph.nodes;
         const nodekeyList = Object.keys(nodesArr[1]);
         const nodePropertyTypes = {};
@@ -1118,6 +1193,14 @@ class StatGroupPanel extends React.Component {
           onClick={this.runCommunityANN}
         >
           Run Community ANN
+        </Button>
+
+        <Button
+          className="bp4-button"
+          style={{ zIndex: "1000" }}
+          onClick={this.runKNNProbability}
+        >
+          Run KNN Probability
         </Button>
 
         <div>

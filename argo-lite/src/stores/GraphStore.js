@@ -97,6 +97,7 @@ export default class GraphStore {
   clusteringco = 0;
   graphDiameter = 0;
   connectcom = 0;
+  community_dict = {};
   community_color_dict = {};
   community_ann_dict = {};
   community_expect_ann_dict = {};

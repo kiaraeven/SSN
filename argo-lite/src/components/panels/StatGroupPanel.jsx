@@ -85,8 +85,11 @@ class StatGroupPanel extends React.Component {
       const height = calculateDistance(minLat, minLon, maxLat, minLon);
       A = width * height;
       let expectedDistance = 0.5 / Math.sqrt(c_n / A);
+      observedDistance /= c_n;
       appState.graph.community_expect_ann_dict[c_id] = expectedDistance;
-      return observedDistance / c_n; // Average Nearest Neighbor Distance
+      // console.log("observedDistance:", observedDistance);
+      // console.log("expectedDistance:", expectedDistance);
+      return observedDistance / expectedDistance;
     };
 
     const nodes = appState.graph.rawGraph.nodes;
@@ -109,21 +112,12 @@ class StatGroupPanel extends React.Component {
     // appState.graph.ann_order is the maximum number of neighbors among all communities
     let maxOrder = 0; // how many neighbor orders to compute
     // record the color for each community in community_color_dict
-    const c_color_dict = {};
-    const frame_nodes = appState.graph.frame.getNodeList();
     for (const [c_id, c_nodes] of Object.entries(communityDict)) {
-      const sample_node = c_nodes[0];
-      frame_nodes.forEach((node) => {
-        if (sample_node.id === node.id) {
-          c_color_dict[c_id] = node.renderData.color;
-        }
-      });
       if (c_nodes.length > maxOrder) {
         maxOrder = c_nodes.length;
       }
     }
     appState.graph.ann_order = maxOrder;
-    appState.graph.community_color_dict = c_color_dict;
     // compute ANN for each community
     for (let order = 1; order <= maxOrder; order++) {
       for (const [c_id, c_nodes] of Object.entries(communityDict)) {
@@ -182,6 +176,11 @@ class StatGroupPanel extends React.Component {
     };
 
     const nodes = appState.graph.rawGraph.nodes;
+    if (!nodes[0]["community"]) {
+      // pop up a prompt box to ask user to run community detection first
+      alert("Please run community detection first");
+      return;
+    }
     for (const node of nodes) {
       // calculate the distance between the node and all other nodes in the network, save them in an array where each element is a pair (the_other_node_id, distance between two nodes) and sorted by distance.
       // the nearest neighborhood only consider geographic distance regardless of the connection
@@ -205,7 +204,7 @@ class StatGroupPanel extends React.Component {
       neighbor_distances.sort((a, b) => a.distance - b.distance);
       const k = node.degree;
       if (k === 0 || node.community === "-1") {
-        node["k-NN Probability"] = 0;
+        node["knn_prob"] = 0;
         continue;
       }
       const k_nearest_neighbors = neighbor_distances
@@ -214,18 +213,18 @@ class StatGroupPanel extends React.Component {
       console.log("k_nearest_neighbors:", k_nearest_neighbors);
       var count = 0; // count the number of k nearest neighbors that are in the same community as the node
       for (const neighbor of k_nearest_neighbors) {
-        console.log(neighbor.community, node.community);
+        // console.log(neighbor.community, node.community);
         if (neighbor.community === node.community) {
           count += 1;
         }
       }
       console.log("count:", count);
       const probability = count / k;
-      node["k-NN Probability"] = probability;
+      node["knn_prob"] = probability;
     }
     // console.log the nodes whose k-NN Probability is not 0
     const nodes_with_nonzero_prob = nodes.filter(
-      (node) => node["k-NN Probability"] !== 0
+      (node) => node["knn_prob"] !== 0
     );
     console.log(nodes_with_nonzero_prob);
 
@@ -282,9 +281,13 @@ class StatGroupPanel extends React.Component {
           if (!communityDict[node.community]) {
             communityDict[node.community] = [];
           }
-          communityDict[node.community].push(node);
+          // check if the node is already in the community array
+          if (!communityDict[node.community].some((n) => n.ID === node.ID)) {
+            communityDict[node.community].push(node);
+          }
         });
         appState.graph.community_dict = communityDict;
+
         const nodesArr = appState.graph.rawGraph.nodes;
         const nodekeyList = Object.keys(nodesArr[1]);
         const nodePropertyTypes = {};
@@ -310,6 +313,19 @@ class StatGroupPanel extends React.Component {
 
         appState.graph.nodes.color.scale = "Nominal Scale";
         appState.graph.nodes.colorBy = "community";
+
+        // record the color for each community in community_color_dict
+        const c_color_dict = {};
+        const frame_nodes = appState.graph.frame.getNodeList();
+        for (const [c_id, c_nodes] of Object.entries(communityDict)) {
+          const sample_node = c_nodes[0];
+          frame_nodes.forEach((node) => {
+            if (sample_node.id === node.id) {
+              c_color_dict[c_id] = node.renderData.color;
+            }
+          });
+        }
+        appState.graph.community_color_dict = c_color_dict;
 
         appState.graph.nodes.convexhullby = "community";
         appState.graph.nodes.groupby = "community";

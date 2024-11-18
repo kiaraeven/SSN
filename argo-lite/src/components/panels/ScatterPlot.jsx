@@ -349,6 +349,8 @@ class ScatterPlot extends React.Component {
           .domain([0, appState.graph.ann_order])
           .range([0, this.width]);
         console.log(x);
+      } else if (appState.graph.scatterplot.x === "k-NN Probability") {
+        x = scaleLinear().domain([0, 1]).range([0, this.width]);
       } else {
         x = scaleLinear()
           .domain([
@@ -420,6 +422,12 @@ class ScatterPlot extends React.Component {
         );
         console.log(max_ann);
         y = scaleLinear().domain([0, max_ann]).range([this.height, 0]);
+      } else if (appState.graph.scatterplot.y === "Community") {
+        // y axis represents communitiy ids, convert the keys to an array and add a new element " " to the beginning of the array to save some space for y = 0
+        var community_ids = Object.keys(appState.graph.community_dict);
+        community_ids.unshift(" ");
+        y = scalePoint().domain(community_ids).range([this.height, 0]);
+        console.log(y);
       } else {
         y = scaleLinear()
           .domain([
@@ -510,6 +518,9 @@ class ScatterPlot extends React.Component {
                 : appState.graph.scatterplot.x == "nodes with larger degree" &&
                   appState.graph.scatterplot.y == "nodes with smaller degree"
                 ? "Degree-Degree Plot"
+                : appState.graph.scatterplot.x == "k-NN Probability" &&
+                  appState.graph.scatterplot.y == "Community"
+                ? "K-NN Probability Plot"
                 : appState.graph.scatterplot.x == "order" &&
                   appState.graph.scatterplot.y == "ANN"
                 ? "ANN Plot"
@@ -617,6 +628,8 @@ class ScatterPlot extends React.Component {
                 appState.graph.scatterplot.y !== "nodes with smaller degree" &&
                 appState.graph.scatterplot.x !== "order" &&
                 appState.graph.scatterplot.y !== "ANN" &&
+                appState.graph.scatterplot.x !== "k-NN Probability" &&
+                appState.graph.scatterplot.y !== "Community" &&
                 this.renderBrush()}
             </svg>
           </div>
@@ -711,7 +724,9 @@ class RenderCircles extends React.Component {
       appState.graph.scatterplot.x !== "nodes with larger degree" &&
       appState.graph.scatterplot.y !== "nodes with smaller degree" &&
       appState.graph.scatterplot.x !== "order" &&
-      appState.graph.scatterplot.y !== "ANN"
+      appState.graph.scatterplot.y !== "ANN" &&
+      appState.graph.scatterplot.x !== "k-NN Probability" &&
+      appState.graph.scatterplot.y !== "Community"
     ) {
       if (
         !appState.graph.currentlyHovered &&
@@ -872,6 +887,23 @@ class RenderCircles extends React.Component {
         stroke: false,
         fillOpacity: 0.8,
       };
+    } else if (
+      appState.graph.scatterplot.x === "k-NN Probability" &&
+      appState.graph.scatterplot.y === "Community"
+    ) {
+      // in this case, each circle represents the k-NN probability of a community
+      // the input param "node" is the community_id, traverse community_color_dict to get the color of the community
+      const community_color_dict = appState.graph.community_color_dict;
+      const community_id = node.community;
+      // console.log(community_id);
+      const community_color = community_color_dict[community_id];
+      // console.log(community_color);
+      return {
+        fill: community_color,
+        zIndex: "10000",
+        stroke: false,
+        fillOpacity: 0.8,
+      };
     } else {
       //path node style
 
@@ -926,7 +958,7 @@ class RenderCircles extends React.Component {
             stroke={appState.graph.community_color_dict[key]}
             strokeWidth="1"
             strokeDasharray={key === "sample" ? "5,5" : "0"} // Apply dashed line for "sample"
-            key={`${key}-${i}`}
+            key={`${annList[i]}-${key}-${i}`}
           />
         );
       }
@@ -1351,10 +1383,29 @@ class RenderCircles extends React.Component {
               r={this.props.cr}
               style={this.setScatterStyle(key)}
               id={key}
-              key={i}
+              key={`${ann}-${key}-${j}`}
             />
           ));
         });
+      } else if (
+        appState.graph.scatterplot.x === "k-NN Probability" &&
+        appState.graph.scatterplot.y === "Community"
+      ) {
+        // in this case, each circle represents the k-NN probability of a community
+        // the input param "node" is the community_id, traverse community_color_dict to get the color of the community
+        const nodes = appState.graph.rawGraph.nodes;
+        renderCircles = nodes
+          .filter((node) => node.community !== -1)
+          .map((node, i) => (
+            <circle
+              cx={this.props.scale.x(node.knn_prob)}
+              cy={this.props.scale.y(node.community)}
+              r={this.props.cr}
+              style={this.setScatterStyle(node)}
+              id={node.ID}
+              key={i}
+            />
+          ));
       } else if (
         appState.graph.scatterplot.y !== "shortest path" &&
         appState.graph.scatterplot.x !== "shortest path" &&

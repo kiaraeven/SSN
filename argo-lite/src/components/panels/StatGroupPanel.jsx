@@ -218,7 +218,7 @@ class StatGroupPanel extends React.Component {
           count += 1;
         }
       }
-      console.log("count:", count);
+      // console.log("count:", count);
       const probability = count / k;
       node["knn_prob"] = probability;
     }
@@ -229,8 +229,8 @@ class StatGroupPanel extends React.Component {
     console.log(nodes_with_nonzero_prob);
 
     // appState.graph.metadata.nodeComputed.push("k-NN Probability");
-    appState.graph.scatterplot.x = "k-NN Probability";
-    appState.graph.scatterplot.y = "Community";
+    appState.graph.scatterplot.y = "k-NN Probability";
+    appState.graph.scatterplot.x = "Community";
     appState.graph.nodes.color.scale = "Nominal Scale";
     appState.graph.nodes.colorBy = "community";
     appState.graph.watchAppearance = appState.graph.watchAppearance + 1; //force update

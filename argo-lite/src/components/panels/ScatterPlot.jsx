@@ -14,9 +14,11 @@ import {
   axisBottom,
   select,
   group,
+  quantile,
 } from "d3";
 import { brush, brushY } from "d3-brush";
 import XYSelect from "../utils/XYSelect";
+import Legend from "../utils/Legend";
 import SVGBrush from "react-svg-brush";
 import path from "ngraph.path";
 import * as SvgSaver from "svgsaver";
@@ -349,8 +351,12 @@ class ScatterPlot extends React.Component {
           .domain([0, appState.graph.ann_order])
           .range([0, this.width]);
         console.log(x);
-      } else if (appState.graph.scatterplot.x === "k-NN Probability") {
-        x = scaleLinear().domain([0, 1]).range([0, this.width]);
+      } else if (appState.graph.scatterplot.x === "Community") {
+        // x = scaleLinear().domain([0, 1]).range([0, this.width]);
+        var community_ids = Object.keys(appState.graph.community_dict);
+        community_ids.unshift(" ");
+        community_ids.push("  ");
+        x = scalePoint().domain(community_ids).range([0, this.width]);
       } else {
         x = scaleLinear()
           .domain([
@@ -422,12 +428,10 @@ class ScatterPlot extends React.Component {
         );
         console.log(max_ann);
         y = scaleLinear().domain([0, max_ann]).range([this.height, 0]);
-      } else if (appState.graph.scatterplot.y === "Community") {
+      } else if (appState.graph.scatterplot.y === "k-NN Probability") {
         // y axis represents communitiy ids, convert the keys to an array and add a new element " " to the beginning of the array to save some space for y = 0
-        var community_ids = Object.keys(appState.graph.community_dict);
-        community_ids.unshift(" ");
-        y = scalePoint().domain(community_ids).range([this.height, 0]);
-        console.log(y);
+        y = scaleLinear().domain([0, 1]).range([this.height, 0]);
+        // console.log(y);
       } else {
         y = scaleLinear()
           .domain([
@@ -518,8 +522,8 @@ class ScatterPlot extends React.Component {
                 : appState.graph.scatterplot.x == "nodes with larger degree" &&
                   appState.graph.scatterplot.y == "nodes with smaller degree"
                 ? "Degree-Degree Plot"
-                : appState.graph.scatterplot.x == "k-NN Probability" &&
-                  appState.graph.scatterplot.y == "Community"
+                : appState.graph.scatterplot.x == "Community" &&
+                  appState.graph.scatterplot.y == "k-NN Probability"
                 ? "K-NN Probability Plot"
                 : appState.graph.scatterplot.x == "order" &&
                   appState.graph.scatterplot.y == "ANN"
@@ -628,8 +632,8 @@ class ScatterPlot extends React.Component {
                 appState.graph.scatterplot.y !== "nodes with smaller degree" &&
                 appState.graph.scatterplot.x !== "order" &&
                 appState.graph.scatterplot.y !== "ANN" &&
-                appState.graph.scatterplot.x !== "k-NN Probability" &&
-                appState.graph.scatterplot.y !== "Community" &&
+                appState.graph.scatterplot.x !== "Community" &&
+                appState.graph.scatterplot.y !== "k-NN Probability" &&
                 this.renderBrush()}
             </svg>
           </div>
@@ -702,6 +706,71 @@ class Axis extends React.Component {
 
 @observer
 class RenderCircles extends React.Component {
+  // calculateBoxPlotData() is used to get q1, median, q3, lowerWhisker, and upperWhisker for a given list of values
+  calculateBoxPlotData = (data) => {
+    const sortedData = data.sort((a, b) => a - b);
+    const q1 = quantile(sortedData, 0.25); // the lower edge of the box.
+    const median = quantile(sortedData, 0.5);
+    const q3 = quantile(sortedData, 0.75); // the upper edge of the box.
+    const iqr = q3 - q1;
+    const lowerWhisker = Math.max(Math.min(...sortedData), q1 - 1.5 * iqr); // the lower whisker extends from the lower edge of the box to the smallest value that is larger than lowerWhisker
+    const upperWhisker = Math.min(Math.max(...sortedData), q3 + 1.5 * iqr); // the upper whisker extends from the upper edge of the box to the largest value that is smaller than upperWhisker
+
+    return { q1, median, q3, lowerWhisker, upperWhisker };
+  };
+
+  renderBoxPlot = (community_knn_dict) => {
+    const boxes = [];
+    Object.keys(community_knn_dict).forEach((key) => {
+      const knnList = community_knn_dict[key];
+      const { q1, median, q3, lowerWhisker, upperWhisker } =
+        this.calculateBoxPlotData(knnList);
+      console.log(q1, median, q3, lowerWhisker, upperWhisker);
+      const xPos = this.props.scale.x(key);
+
+      boxes.push(
+        <g key={key}>
+          {/* Whiskers */}
+          <line
+            x1={xPos}
+            x2={xPos}
+            y1={this.props.scale.y(lowerWhisker)}
+            y2={this.props.scale.y(q1)}
+            stroke="black"
+          />
+          <line
+            x1={xPos}
+            x2={xPos}
+            y1={this.props.scale.y(q3)}
+            y2={this.props.scale.y(upperWhisker)}
+            stroke="black"
+          />
+
+          {/* Box */}
+          <rect
+            x={xPos - 10}
+            y={this.props.scale.y(q3)} // ?
+            width={20}
+            height={this.props.scale.y(q1) - this.props.scale.y(q3)}
+            fill="lightgray"
+            stroke="black"
+          />
+
+          {/* Median */}
+          <line
+            x1={xPos - 10}
+            x2={xPos + 10}
+            y1={this.props.scale.y(median)}
+            y2={this.props.scale.y(median)}
+            stroke="red"
+          />
+        </g>
+      );
+    });
+    console.log(boxes);
+    return boxes;
+  };
+
   setScatterStyle = (node, ni) => {
     // ni is the index of the node in the array
     // const dehighlightNode = {
@@ -725,8 +794,8 @@ class RenderCircles extends React.Component {
       appState.graph.scatterplot.y !== "nodes with smaller degree" &&
       appState.graph.scatterplot.x !== "order" &&
       appState.graph.scatterplot.y !== "ANN" &&
-      appState.graph.scatterplot.x !== "k-NN Probability" &&
-      appState.graph.scatterplot.y !== "Community"
+      appState.graph.scatterplot.x !== "Community" &&
+      appState.graph.scatterplot.y !== "k-NN Probability"
     ) {
       if (
         !appState.graph.currentlyHovered &&
@@ -888,8 +957,8 @@ class RenderCircles extends React.Component {
         fillOpacity: 0.8,
       };
     } else if (
-      appState.graph.scatterplot.x === "k-NN Probability" &&
-      appState.graph.scatterplot.y === "Community"
+      appState.graph.scatterplot.y === "k-NN Probability" &&
+      appState.graph.scatterplot.x === "Community"
     ) {
       // in this case, each circle represents the k-NN probability of a community
       // the input param "node" is the community_id, traverse community_color_dict to get the color of the community
@@ -972,6 +1041,7 @@ class RenderCircles extends React.Component {
       let renderCircles = [];
       let renderLines = [];
       // let renderLabels = []
+      let renderBoxPlot = [];
       // let ydata =[]
       if (
         (appState.graph.scatterplot.x === "network density" &&
@@ -1372,6 +1442,7 @@ class RenderCircles extends React.Component {
         });
         console.log(community_ann_dict_clean);
         renderLines = this.renderLines(community_ann_dict_clean);
+        // renderLabels = this.renderLabels(community_ann_dict_clean);
         renderCircles = Object.keys(community_ann_dict_clean).map((key, i) => {
           // console.log(community_ann_dict_clean[key])
           return community_ann_dict_clean[key].map((ann, j) => (
@@ -1388,24 +1459,37 @@ class RenderCircles extends React.Component {
           ));
         });
       } else if (
-        appState.graph.scatterplot.x === "k-NN Probability" &&
-        appState.graph.scatterplot.y === "Community"
+        appState.graph.scatterplot.x === "Community" &&
+        appState.graph.scatterplot.y === "k-NN Probability"
       ) {
         // in this case, each circle represents the k-NN probability of a community
         // the input param "node" is the community_id, traverse community_color_dict to get the color of the community
         const nodes = appState.graph.rawGraph.nodes;
-        renderCircles = nodes
-          .filter((node) => node.community !== -1)
-          .map((node, i) => (
-            <circle
-              cx={this.props.scale.x(node.knn_prob)}
-              cy={this.props.scale.y(node.community)}
-              r={this.props.cr}
-              style={this.setScatterStyle(node)}
-              id={node.ID}
-              key={i}
-            />
-          ));
+        // renderCircles = nodes
+        //   .filter((node) => node.community !== -1)
+        //   .map((node, i) => (
+        //     <circle
+        //       cx={this.props.scale.x(node.community)}
+        //       cy={this.props.scale.y(node.knn_prob)}
+        //       r={this.props.cr}
+        //       style={this.setScatterStyle(node)}
+        //       id={node.ID}
+        //       key={i}
+        //     />
+        //   ));
+        const community_dict = appState.graph.community_dict;
+        var community_knn_dict = {};
+        Object.keys(community_dict).forEach((key) => {
+          community_knn_dict[key] = [];
+        });
+        nodes
+          .filter((node) => node.community !== "-1")
+          .forEach((node) => {
+            console.log(node.community, node.knn_prob);
+            console.log(community_knn_dict);
+            community_knn_dict[node.community].push(node.knn_prob);
+          });
+        renderBoxPlot = this.renderBoxPlot(community_knn_dict);
       } else if (
         appState.graph.scatterplot.y !== "shortest path" &&
         appState.graph.scatterplot.x !== "shortest path" &&
@@ -1463,6 +1547,7 @@ class RenderCircles extends React.Component {
 
       return (
         <g>
+          {renderBoxPlot}
           {renderLines}
           {renderCircles}
         </g>

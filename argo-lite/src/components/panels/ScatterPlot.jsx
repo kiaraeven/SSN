@@ -727,6 +727,7 @@ class RenderCircles extends React.Component {
         this.calculateBoxPlotData(knnList);
       console.log(q1, median, q3, lowerWhisker, upperWhisker);
       const xPos = this.props.scale.x(key);
+      const fill_color = appState.graph.community_color_dict[key];
 
       boxes.push(
         <g key={key}>
@@ -752,7 +753,7 @@ class RenderCircles extends React.Component {
             y={this.props.scale.y(q3)} // ?
             width={20}
             height={this.props.scale.y(q1) - this.props.scale.y(q3)}
-            fill="lightgray"
+            fill={fill_color}
             stroke="black"
           />
 

@@ -351,12 +351,28 @@ class ScatterPlot extends React.Component {
           .domain([0, appState.graph.ann_order])
           .range([0, this.width]);
         console.log(x);
-      } else if (appState.graph.scatterplot.x === "Community") {
+      } else if (appState.graph.scatterplot.x === appState.graph.groupby) {
         // x = scaleLinear().domain([0, 1]).range([0, this.width]);
-        var community_ids = Object.keys(appState.graph.community_dict);
-        community_ids.unshift(" ");
-        community_ids.push("  ");
-        x = scalePoint().domain(community_ids).range([0, this.width]);
+        if (appState.graph.groupby === "community") {
+          var community_ids = Object.keys(appState.graph.community_dict);
+          community_ids.unshift(" ");
+          community_ids.push("  ");
+          x = scalePoint().domain(community_ids).range([0, this.width]);
+        } else {
+          const nodes = appState.graph.rawGraph.nodes;
+          // construct a set for groupby property (no duplicate elements)
+          var groupby_set = new Set();
+          nodes.forEach((node) => {
+            groupby_set.add(node[appState.graph.groupby]);
+          });
+          // convert the set to an array
+          var groupby_array = Array.from(groupby_set);
+          // add an empty element to the beginning of the array to save some space for x = 0
+          groupby_array.unshift(" ");
+          // add an empty element to the end of the array to save some space for the end
+          groupby_array.push("  ");
+          x = scalePoint().domain(groupby_array).range([0, this.width]);
+        }
       } else {
         x = scaleLinear()
           .domain([
@@ -522,7 +538,7 @@ class ScatterPlot extends React.Component {
                 : appState.graph.scatterplot.x == "nodes with larger degree" &&
                   appState.graph.scatterplot.y == "nodes with smaller degree"
                 ? "Degree-Degree Plot"
-                : appState.graph.scatterplot.x == "Community" &&
+                : appState.graph.scatterplot.x == appState.graph.groupby &&
                   appState.graph.scatterplot.y == "k-NN Probability"
                 ? "K-NN Probability Plot"
                 : appState.graph.scatterplot.x == "order" &&
@@ -632,7 +648,7 @@ class ScatterPlot extends React.Component {
                 appState.graph.scatterplot.y !== "nodes with smaller degree" &&
                 appState.graph.scatterplot.x !== "order" &&
                 appState.graph.scatterplot.y !== "ANN" &&
-                appState.graph.scatterplot.x !== "Community" &&
+                appState.graph.scatterplot.x !== appState.graph.groupby &&
                 appState.graph.scatterplot.y !== "k-NN Probability" &&
                 this.renderBrush()}
             </svg>
@@ -719,15 +735,23 @@ class RenderCircles extends React.Component {
     return { q1, median, q3, lowerWhisker, upperWhisker };
   };
 
-  renderBoxPlot = (community_knn_dict) => {
+  renderBoxPlot = (groupby_knn_dict) => {
     const boxes = [];
-    Object.keys(community_knn_dict).forEach((key) => {
-      const knnList = community_knn_dict[key];
+    var color_dict;
+    if (appState.graph.groupby === "community") {
+      color_dict = appState.graph.community_color_dict;
+    } else {
+      color_dict = appState.graph.groupby_color_dict;
+    }
+    // console.log("groupby_knn_dict", groupby_knn_dict);
+    Object.keys(groupby_knn_dict).forEach((key) => {
+      const knnList = groupby_knn_dict[key];
+      // console.log("knnList", knnList);
       const { q1, median, q3, lowerWhisker, upperWhisker } =
         this.calculateBoxPlotData(knnList);
       console.log(q1, median, q3, lowerWhisker, upperWhisker);
       const xPos = this.props.scale.x(key);
-      const fill_color = appState.graph.community_color_dict[key];
+      const fill_color = color_dict[key];
 
       boxes.push(
         <g key={key}>
@@ -795,7 +819,7 @@ class RenderCircles extends React.Component {
       appState.graph.scatterplot.y !== "nodes with smaller degree" &&
       appState.graph.scatterplot.x !== "order" &&
       appState.graph.scatterplot.y !== "ANN" &&
-      appState.graph.scatterplot.x !== "Community" &&
+      appState.graph.scatterplot.x !== appState.graph.groupby &&
       appState.graph.scatterplot.y !== "k-NN Probability"
     ) {
       if (
@@ -959,21 +983,33 @@ class RenderCircles extends React.Component {
       };
     } else if (
       appState.graph.scatterplot.y === "k-NN Probability" &&
-      appState.graph.scatterplot.x === "Community"
+      appState.graph.scatterplot.x === appState.graph.groupby
     ) {
       // in this case, each circle represents the k-NN probability of a community
       // the input param "node" is the community_id, traverse community_color_dict to get the color of the community
-      const community_color_dict = appState.graph.community_color_dict;
-      const community_id = node.community;
-      // console.log(community_id);
-      const community_color = community_color_dict[community_id];
-      // console.log(community_color);
-      return {
-        fill: community_color,
-        zIndex: "10000",
-        stroke: false,
-        fillOpacity: 0.8,
-      };
+      if (appState.graph.groupby === "community") {
+        const community_color_dict = appState.graph.community_color_dict;
+        const community_id = node.community;
+        const c_color = community_color_dict[community_id];
+        return {
+          fill: c_color,
+          zIndex: "10000",
+          stroke: false,
+          fillOpacity: 0.8,
+        };
+      } else {
+        console.log("999");
+        // const groupby_color_dict = appState.graph.groupby_color_dict;
+        // const c_id = node[appState.graph.groupby];
+        // const c_color = groupby_color_dict[c_id];
+        const c_color = "#000000";
+        return {
+          fill: c_color,
+          zIndex: "10000",
+          stroke: false,
+          fillOpacity: 0.8,
+        };
+      }
     } else {
       //path node style
 
@@ -1460,7 +1496,7 @@ class RenderCircles extends React.Component {
           ));
         });
       } else if (
-        appState.graph.scatterplot.x === "Community" &&
+        appState.graph.scatterplot.x === appState.graph.groupby &&
         appState.graph.scatterplot.y === "k-NN Probability"
       ) {
         // in this case, each circle represents the k-NN probability of a community
@@ -1478,19 +1514,67 @@ class RenderCircles extends React.Component {
         //       key={i}
         //     />
         //   ));
-        const community_dict = appState.graph.community_dict;
-        var community_knn_dict = {};
-        Object.keys(community_dict).forEach((key) => {
-          community_knn_dict[key] = [];
-        });
-        nodes
-          .filter((node) => node.community !== "-1")
-          .forEach((node) => {
-            console.log(node.community, node.knn_prob);
-            console.log(community_knn_dict);
-            community_knn_dict[node.community].push(node.knn_prob);
+        // const community_dict = appState.graph.community_dict;
+        // var community_knn_dict = {};
+        // Object.keys(community_dict).forEach((key) => {
+        //   community_knn_dict[key] = [];
+        // });
+        // nodes
+        //   .filter((node) => node.community !== "-1")
+        //   .forEach((node) => {
+        //     console.log(node.community, node.knn_prob);
+        //     console.log(community_knn_dict);
+        //     community_knn_dict[node.community].push(node.knn_prob);
+        //   });
+
+        var groupby_knn_dict = {};
+        if (appState.graph.groupby === "community") {
+          Object.keys(appState.graph.community_dict).forEach((key) => {
+            groupby_knn_dict[key] = [];
           });
-        renderBoxPlot = this.renderBoxPlot(community_knn_dict);
+        } else {
+          // construct a color dict based on the groupby property
+          const groupby_color_dict = {};
+          // construct groupby_dict
+          const groupby_dict = {};
+          nodes.forEach((node) => {
+            if (groupby_dict[node[appState.graph.groupby]]) {
+              groupby_dict[node[appState.graph.groupby]].push(node);
+            } else {
+              groupby_dict[node[appState.graph.groupby]] = [node];
+            }
+          });
+          // appState.graph.groupby_dict = groupby_dict;
+          // console.log(groupby_dict);
+          const frame_nodes = appState.graph.frame.getNodeList();
+          for (const [c_id, c_nodes] of Object.entries(groupby_dict)) {
+            const sample_node = c_nodes[0];
+            frame_nodes.forEach((node) => {
+              if (sample_node.id === node.id) {
+                groupby_color_dict[c_id] = node.renderData.color;
+              }
+            });
+          }
+          // console.log(groupby_color_dict);
+          appState.graph.groupby_color_dict = groupby_color_dict;
+          Object.keys(groupby_dict).forEach((key) => {
+            groupby_knn_dict[key] = [];
+          });
+        }
+
+        nodes
+          .filter((node) => {
+            if (appState.graph.groupby === "community") {
+              return node.community !== "-1";
+            }
+            return true;
+          })
+          .forEach((node) => {
+            // console.log(node[appState.graph.groupby], node.knn_prob);
+            groupby_knn_dict[node[appState.graph.groupby]].push(node.knn_prob);
+          });
+        // console.log(groupby_knn_dict);
+        renderBoxPlot = this.renderBoxPlot(groupby_knn_dict);
       } else if (
         appState.graph.scatterplot.y !== "shortest path" &&
         appState.graph.scatterplot.x !== "shortest path" &&

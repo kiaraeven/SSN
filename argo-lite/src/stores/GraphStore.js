@@ -97,10 +97,17 @@ export default class GraphStore {
   clusteringco = 0;
   graphDiameter = 0;
   connectcom = 0;
-  @observable community_dict = {};
-  @observable community_color_dict = {};
+  community_dict = {};
+  community_color_dict = {};
+  groupby_color_dict = {};
   @observable community_ann_dict = {};
   community_expect_ann_dict = {};
+  @observable knnProbabilityUpdated = false; // Add this flag
+
+  @action
+  updateKNNProbabilityFlag(value) {
+    this.knnProbabilityUpdated = value;
+  }
 
   //access to process.js "self"
   @observable process = undefined;

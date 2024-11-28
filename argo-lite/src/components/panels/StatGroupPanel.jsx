@@ -21,6 +21,7 @@ import path from "ngraph.path";
 
 import axios from "axios";
 import { observable, computed, action, runInAction } from "mobx";
+import { group } from "d3-array";
 
 @observer
 class StatGroupPanel extends React.Component {
@@ -175,10 +176,124 @@ class StatGroupPanel extends React.Component {
       return distance; // distance in kilometers
     };
 
+    // // it is the selected item in the dropdown menu, which is used to group the nodes
+    // if (appState.graph.groupby === "community") {
+    //   const groupby = appState.graph.groupby;
+    //   // if the user wants to group the nodes by community, calculate the k-NN for each community
+    //   const nodes = appState.graph.rawGraph.nodes;
+    //   if (!nodes[0][groupby]) {
+    //     // pop up a prompt box to ask user to run community detection first
+    //     alert({ groupby } + " not supported.");
+    //     return;
+    //   }
+    //   for (const node of nodes) {
+    //     // calculate the distance between the node and all other nodes in the network, save them in an array where each element is a pair (the_other_node_id, distance between two nodes) and sorted by distance.
+    //     // the nearest neighborhood only consider geographic distance regardless of the connection
+    //     const neighbor_distances = [];
+    //     for (const other_node of nodes) {
+    //       if (node.ID !== other_node.ID) {
+    //         const distance = calculateDistance(
+    //           node.LatY,
+    //           node.LonX,
+    //           other_node.LatY,
+    //           other_node.LonX
+    //         );
+    //         neighbor_distances.push({
+    //           other_node: other_node,
+    //           distance: distance,
+    //         });
+    //       }
+    //     }
+    //     // console.log("neighbor_distances:", neighbor_distances);
+    //     // find the k nearest neighbors from neirbor_distances
+    //     neighbor_distances.sort((a, b) => a.distance - b.distance);
+    //     const k = node.degree;
+    //     if (k === 0 || node.community === "-1") {
+    //       node["knn_prob"] = 0;
+    //       continue;
+    //     }
+    //     const k_nearest_neighbors = neighbor_distances
+    //       .slice(0, k)
+    //       .map((n) => n.other_node);
+    //     console.log("k_nearest_neighbors:", k_nearest_neighbors);
+    //     var count = 0; // count the number of k nearest neighbors that are in the same community as the node
+    //     for (const neighbor of k_nearest_neighbors) {
+    //       // console.log(neighbor.community, node.community);
+    //       if (neighbor.community === node.community) {
+    //         count += 1;
+    //       }
+    //     }
+    //     // console.log("count:", count);
+    //     const probability = count / k;
+    //     node["knn_prob"] = probability;
+    //   }
+    //   // console.log the nodes whose k-NN Probability is not 0
+    //   const nodes_with_nonzero_prob = nodes.filter(
+    //     (node) => node["knn_prob"] !== 0
+    //   );
+    //   console.log(nodes_with_nonzero_prob);
+
+    //   // appState.graph.metadata.nodeComputed.push("k-NN Probability");
+    //   appState.graph.scatterplot.y = "k-NN Probability";
+    //   appState.graph.scatterplot.x = "Community";
+    //   appState.graph.nodes.color.scale = "Nominal Scale";
+    //   appState.graph.nodes.colorBy = "community";
+    //   appState.graph.watchAppearance = appState.graph.watchAppearance + 1; //force update
+    // } else {
+    //   // otherwise it should be an attribute from appState.graph.filterKeyList, whose elements are extracted from appState.graph.rawGraph.nodes[0]
+    //   const nodes = appState.graph.rawGraph.nodes;
+    //   for (const node of nodes) {
+    //     const neighbor_distances = [];
+    //     for (const other_node of nodes) {
+    //       if (node.ID !== other_node.ID) {
+    //         const distance = calculateDistance(
+    //           node.LatY,
+    //           node.LonX,
+    //           other_node.LatY,
+    //           other_node.LonX
+    //         );
+    //         neighbor_distances.push({
+    //           other_node: other_node,
+    //           distance: distance,
+    //         });
+    //       }
+    //     }
+    //     neighbor_distances.sort((a, b) => a.distance - b.distance);
+    //     const k = node.degree;
+    //     if (k === 0 || !node[it]) {
+    //       node["knn_prob"] = 0;
+    //       continue;
+    //     }
+    //     const k_nearest_neighbors = neighbor_distances
+    //       .slice(0, k)
+    //       .map((n) => n.other_node);
+    //     var count = 0;
+    //     for (const neighbor of k_nearest_neighbors) {
+    //       if (neighbor[it] === node[it]) {
+    //         count += 1;
+    //       }
+    //     }
+    //     const probability = count / k;
+    //     node["knn_prob"] = probability;
+    //   }
+    //   const nodes_with_nonzero_prob = nodes.filter(
+    //     (node) => node["knn_prob"] !== 0
+    //   );
+    //   console.log(nodes_with_nonzero_prob);
+
+    //   appState.graph.scatterplot.y = "k-NN Probability";
+    //   appState.graph.scatterplot.x = it;
+    //   appState.graph.nodes.color.scale = "Nominal Scale";
+    //   appState.graph.nodes.colorBy = it;
+    //   appState.graph.watchAppearance = appState.graph.watchAppearance + 1;
+    // }
+
+    const groupby = appState.graph.groupby;
+    // if the user wants to group the nodes by community, calculate the k-NN for each community
     const nodes = appState.graph.rawGraph.nodes;
-    if (!nodes[0]["community"]) {
+    if (!nodes[0][groupby]) {
       // pop up a prompt box to ask user to run community detection first
-      alert("Please run community detection first");
+      alert({ groupby } + " not supported.");
       return;
     }
     for (const node of nodes) {
@@ -203,7 +318,7 @@ class StatGroupPanel extends React.Component {
       // find the k nearest neighbors from neirbor_distances
       neighbor_distances.sort((a, b) => a.distance - b.distance);
       const k = node.degree;
-      if (k === 0 || node.community === "-1") {
+      if (groupby === "community" && (k === 0 || node.community === "-1")) {
         node["knn_prob"] = 0;
         continue;
       }
@@ -214,7 +329,7 @@ class StatGroupPanel extends React.Component {
       var count = 0; // count the number of k nearest neighbors that are in the same community as the node
       for (const neighbor of k_nearest_neighbors) {
         // console.log(neighbor.community, node.community);
-        if (neighbor.community === node.community) {
+        if (neighbor[groupby] === node[groupby]) {
           count += 1;
         }
       }
@@ -222,18 +337,19 @@ class StatGroupPanel extends React.Component {
       const probability = count / k;
       node["knn_prob"] = probability;
     }
-    // console.log the nodes whose k-NN Probability is not 0
+    // console.log the nodes whose k-NN Probability is not 1
     const nodes_with_nonzero_prob = nodes.filter(
-      (node) => node["knn_prob"] !== 0
+      (node) => node["knn_prob"] !== 1
     );
     console.log(nodes_with_nonzero_prob);
 
     // appState.graph.metadata.nodeComputed.push("k-NN Probability");
     appState.graph.scatterplot.y = "k-NN Probability";
-    appState.graph.scatterplot.x = "Community";
+    appState.graph.scatterplot.x = groupby;
     appState.graph.nodes.color.scale = "Nominal Scale";
-    appState.graph.nodes.colorBy = "community";
+    appState.graph.nodes.colorBy = groupby;
     appState.graph.watchAppearance = appState.graph.watchAppearance + 1; //force update
+    // appState.graph.updateKNNProbabilityFlag(true); // Set the flag to true
   };
 
   runcommunity = () => {
@@ -337,6 +453,7 @@ class StatGroupPanel extends React.Component {
         console.log(error);
       }
     );
+    // appState.graph.updateKNNProbabilityFlag(false);
   };
 
   avgConnectionDist = () => {
@@ -1221,6 +1338,32 @@ class StatGroupPanel extends React.Component {
 
         <div>
           <p style={{ display: "inline", fontSize: "12px" }}>
+            Run KNN Probability:{" "}
+          </p>
+          <span style={{}}>
+            <SimpleSelect
+              items={appState.graph.filterKeyList.filter(
+                (it) =>
+                  it !== "ID" &&
+                  (it === "community" ||
+                    isNaN(appState.graph.rawGraph.nodes[0][it]))
+              )}
+              onSelect={(it) => {
+                console.log(it);
+                appState.graph.convexhullby = it;
+                this.convexhull(it);
+                appState.graph.convexPolygonsShow = true;
+                //followed by cluster by function
+                appState.graph.groupby = it;
+                this.runKNNProbability();
+              }}
+              value={appState.graph.groupby}
+            />
+          </span>
+        </div>
+
+        <div>
+          <p style={{ display: "inline", fontSize: "12px" }}>
             Convex Hull By:{" "}
           </p>
           <span style={{}}>
@@ -1232,6 +1375,7 @@ class StatGroupPanel extends React.Component {
                     isNaN(appState.graph.rawGraph.nodes[0][it]))
               )}
               onSelect={(it) => {
+                console.log("convex hull by", it);
                 appState.graph.convexhullby = it;
                 this.convexhull(it);
                 appState.graph.convexPolygonsShow = true;
@@ -1243,6 +1387,7 @@ class StatGroupPanel extends React.Component {
             />
           </span>
         </div>
+
         <div>
           <p style={{ display: "inline", fontSize: "12px" }}>Group By: </p>
           <span style={{}}>

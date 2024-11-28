@@ -62,12 +62,12 @@ class NodesFilterPanel extends React.Component {
             }
           >
             <div className={classnames(Classes.CARD, "sub-option")}>
-              {console.log(
+              {/* {console.log(
                 `Filter key: ${it}, Should use RangeSlider: ${!(
                   it === "community" ||
                   isNaN(appState.graph.rawGraph.nodes[0][it])
                 )}`
-              )}
+              )} */}
               {it === "community" ||
               isNaN(appState.graph.rawGraph.nodes[0][it]) ? (
                 <MultiSelects

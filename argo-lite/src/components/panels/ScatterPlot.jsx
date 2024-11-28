@@ -736,6 +736,9 @@ class RenderCircles extends React.Component {
   };
 
   renderBoxPlot = (groupby_knn_dict) => {
+    if (!appState.graph.knnProbabilityUpdated) {
+      return appState.graph.boxes;
+    }
     const boxes = [];
     var color_dict;
     if (appState.graph.groupby === "community") {
@@ -793,6 +796,8 @@ class RenderCircles extends React.Component {
       );
     });
     console.log(boxes);
+    appState.graph.boxes = boxes;
+    appState.graph.knnProbabilityUpdated = false;
     return boxes;
   };
 

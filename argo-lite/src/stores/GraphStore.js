@@ -102,12 +102,8 @@ export default class GraphStore {
   groupby_color_dict = {};
   @observable community_ann_dict = {};
   community_expect_ann_dict = {};
-  @observable knnProbabilityUpdated = false; // Add this flag
-
-  @action
-  updateKNNProbabilityFlag(value) {
-    this.knnProbabilityUpdated = value;
-  }
+  knnProbabilityUpdated = false; // Add this flag
+  boxes = [];
 
   //access to process.js "self"
   @observable process = undefined;

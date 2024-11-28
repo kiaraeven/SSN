@@ -349,7 +349,7 @@ class StatGroupPanel extends React.Component {
     appState.graph.nodes.color.scale = "Nominal Scale";
     appState.graph.nodes.colorBy = groupby;
     appState.graph.watchAppearance = appState.graph.watchAppearance + 1; //force update
-    // appState.graph.updateKNNProbabilityFlag(true); // Set the flag to true
+    appState.graph.knnProbabilityUpdated = true;
   };
 
   runcommunity = () => {
@@ -1326,14 +1326,6 @@ class StatGroupPanel extends React.Component {
           onClick={this.runCommunityANN}
         >
           Run Community ANN
-        </Button>
-
-        <Button
-          className="bp4-button"
-          style={{ zIndex: "1000" }}
-          onClick={this.runKNNProbability}
-        >
-          Run KNN Probability
         </Button>
 
         <div>
